@@ -1,0 +1,83 @@
+#!/bin/bash
+
+  apt update -y
+  apt upgrade -y
+
+if [ $(dpkg-query -W -f='${Status}' nginx 2>/dev/null | grep -c "ok installed") -eq 0 ]; then
+  # nginx is not installed, install it
+  apt install nginx -y
+  echo "NGINX Installed"
+else
+  # nginx is installed, skip installation
+  echo "nginx is already installed"
+fi
+
+if [ $(dpkg-query -W -f='${Status}' python3-certbot-dns-cloudflare 2>/dev/null | grep -c "ok installed") -eq 0 ]; then
+  apt install python3-certbot-dns-cloudflare -y
+  mkdir /root/.secrets/
+  touch /root/.secrets/cloudflare.ini
+  read -p "Enter your Cloudflare Email :" CLOUDFLARE_EMAIL
+  read -p "Enter your Cloudflare API Key:" CLOUDFLARE_API_KEY
+sudo tee /root/.secrets/cloudflare.ini > /dev/null << EOF
+  dns_cloudflare_email = ${CLOUDFLARE_EMAIL}
+  dns_cloudflare_api_key = ${CLOUDFLARE_API_KEY}
+EOF
+  chmod 0700 /root/.secrets/
+  chmod 0400 /root/.secrets/cloudflare.ini
+  echo "Certbot-dns-Cloudflare Installed"
+  echo ""
+  echo "Settings saved to /root/.secrets/cloudflare.ini"
+else
+  echo "Certbot-dns-CloudFlare already installed"
+fi
+
+if [ $(dpkg-query -W -f='${Status}' php 2>/dev/null | grep -c "ok installed") -eq 0 ]; then
+  # PHP is not installed, install it 
+  sudo apt-get install php-fpm php-common php-mysql php-xml php-gd php-curl php-json -y
+  echo "PHP Installed"
+else
+  # PHP is installed, skip installation
+  echo "PHP is already installed"
+
+fi
+
+# Check if Mariadb is installed
+if [ $(dpkg-query -W -f='${Status}' mariadb-server 2>/dev/null | grep -c "ok installed") -eq 0 ]; then
+	apt install mariadb-client mariadb-server -y
+	apt install expect -y
+		# Secure the MYSQL Server
+		CURRENT_MYSQL_PASSWORD=''
+		MYSQL_ROOT_PASSWORD=$(openssl rand -base64 29 | tr -d "=+/" | cut -c1-25)
+		SECURE_MYSQL=$(expect -c "
+		set timeout 1
+		spawn mysql_secure_installation
+		expect \"Enter current password for root (enter for none):\"
+		send \"${CURRENT_MYSQL_PASSWORD}\r\"
+		expect \"root password?\"
+		send \"y\r\"
+		expect \"New password:\"
+		send \"${MYSQL_ROOT_PASSWORD}\r\"
+		expect \"Re-enter new password:\"
+		send \"${MYSQL_ROOT_PASSWORD}\r\"
+		expect \"Remove anonymous users?\"
+		send \"y\r\"
+		expect \"Disallow root login remotely?\"
+		send \"y\r\"
+		expect \"Remove test database and access to it?\"
+		send \"y\r\"
+		expect \"Reload privilege tables now?\"
+		send \"y\r\"
+		expect eof
+		")
+		echo "${SECURE_MYSQL}"
+		  set timeout 1
+		  apt remove expect -y
+		  apt autoremove -y
+		  read -p "Press [ENTER] to display your MySQL Root Password!"
+		  echo "Mysql Root Password is ${MYSQL_ROOT_PASSWORD}"
+		  echo "Never share this password. Write it down somewhere safe!"
+else
+  # Mariadb is installed, skip installation
+  echo "Mariadb is already installed"
+    echo "Continue"
+fi

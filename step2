@@ -1,0 +1,157 @@
+#!/bin/bash
+#!/bin/bash
+NGINX_CONF_DIR="/etc/nginx"
+AVAILABLE_SITES_DIR="${NGINX_CONF_DIR}/sites-available"
+ENABLED_SITES_DIR="${NGINX_CONF_DIR}/sites-enabled"
+NGINX_USER="www-data"
+NGINX_GROUP="www-data"
+PHPVERSION="AutoCheck"
+echo "Please provide your domain name without the www. (e.g. mydomain.com or blog.mydomain.com)"
+read -p "Type your domain name, then press [ENTER] : " WEBSITE_NAME
+echo ""
+echo ""
+echo "Please provide a database name for your WordPress website. (short names are better, i.e wpdb1 or db1 , etc)"
+read -p "Type your database name, then press [ENTER] : " DB_NAME
+echo ""
+echo ""
+echo "Please provide a username for your WordPress database. (short names are better, i.e wpuser1 or user1 , etc)"
+read -p "Type your database username name, then press [ENTER] : " DB_USER
+echo ""
+echo "For security reasons a secure pass will be generated and shown at the end of the set up!"
+echo ""
+read -p "Press any key to continue."
+DOCUMENT_ROOT="/var/www/html/${WEBSITE_NAME}"
+
+certbot certonly --dns-cloudflare --dns-cloudflare-credentials /root/.secrets/cloudflare.ini -d ${WEBSITE_NAME},*.${WEBSITE_NAME} --preferred-challenges dns-01
+
+# Create website directory
+sudo mkdir -p ${DOCUMENT_ROOT}
+
+PHPVERSION=$(php -v | awk '/^PHP/ {print $2}' | cut -f1,2 -d'.')
+perl -pi -e "s/;cgi.fix_pathinfo=1/cgi.fix_pathinfo=0/g" /etc/php/${PHPVERSION}/fpm/php.ini
+
+# Create nginx server block configuration file
+sudo tee ${AVAILABLE_SITES_DIR}/${WEBSITE_NAME} > /dev/null << EOF
+server {
+    listen 80;
+    listen [::]:80;
+
+    root ${DOCUMENT_ROOT};
+    index index.php;
+
+    server_name ${WEBSITE_NAME};
+
+    location / {
+        try_files \$uri \$uri/ =404;
+    }
+
+    location = /favicon.ico {
+        log_not_found off;
+        access_log off;
+    }
+
+    location ~* \.(jpg|jpeg|png|gif|ico|css|js|xls|xlm)$ {
+        expires max;
+        log_not_found off;
+    }
+
+    # Enable gzip compression
+    gzip on;
+    gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript;
+
+    # Enable SSL/TLS by uncommenting the following lines and configuring the SSL certificate
+	listen 443 ssl;
+	listen [::]:443 ssl;
+	ssl_certificate /etc/letsencrypt/live/${WEBSITE_NAME}/fullchain.pem;
+	ssl_certificate_key /etc/letsencrypt/live/${WEBSITE_NAME}/privkey.pem;
+
+    # SSL configuration
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers EECDH+AESGCM:EDH+AESGCM;
+    ssl_prefer_server_ciphers on;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 5m;
+
+    # Add headers to serve security related headers
+    add_header Strict-Transport-Security "max-age=15768000; includeSubDomains; preload;";
+    add_header X-Content-Type-Options nosniff;
+    add_header X-Frame-Options "SAMEORIGIN";
+    add_header X-XSS-Protection "1; mode=block";
+
+    # Enable PHP-FPM
+     location ~ \.php$ {
+         include snippets/fastcgi-php.conf;
+         fastcgi_pass unix:/var/run/php/php-fpm.sock;
+     }
+
+    # Disable access to hidden files and directories (starting with a dot)
+    location ~ /\. {
+        deny all;
+        access_log off;
+        log_not_found off;
+    }
+
+    # Enable access logging for this server block
+    access_log /var/log/nginx/${WEBSITE_NAME}.access.log;
+    error_log /var/log/nginx/${WEBSITE_NAME}.error.log;
+}
+
+EOF
+echo "Created NGINX Server Profile for ${WEBSITE_NAME}"
+
+# Create symbolic link to enable the site
+sudo ln -s ${AVAILABLE_SITES_DIR}/${WEBSITE_NAME} ${ENABLED_SITES_DIR}/${WEBSITE_NAME}
+echo "Created symbolic link - ${AVAILABLE_SITES_DIR}/${WEBSITE_NAME} ${ENABLED_SITES_DIR}/${WEBSITE_NAME}" 
+
+read -s -p "Enter your MYSQL root password: " MYSQL_ROOT_PASSWORD
+
+# Create WordPress MySQL database
+userpass=$(openssl rand -base64 29 | tr -d "=+/" | cut -c1-25)
+echo "CREATE DATABASE ${DB_NAME};" | mysql -u root -p${MYSQL_ROOT_PASSWORD}
+echo "CREATE USER '${DB_USER}'@'localhost' IDENTIFIED BY '$userpass';" | mysql -u root -p${MYSQL_ROOT_PASSWORD}
+echo "GRANT ALL PRIVILEGES ON ${DB_NAME}.* TO '${DB_USER}'@'localhost';" | mysql -u root -p${MYSQL_ROOT_PASSWORD}
+echo "FLUSH PRIVILEGES;" | mysql -u root -p${MYSQL_ROOT_PASSWORD}
+echo "WordPress Database Created."
+
+# Grab the latest WordPress tar.gz and finish up
+wget https://wordpress.org/latest.tar.gz
+tar xzvf latest.tar.gz -C ${DOCUMENT_ROOT} --strip-components=1 >/dev/null 2>&1
+cp ${DOCUMENT_ROOT}/wp-config-sample.php ${DOCUMENT_ROOT}/wp-config.php
+mkdir ${DOCUMENT_ROOT}/wp-content/upgrade
+chown -R ${NGINX_USER}:${NGINX_GROUP} ${DOCUMENT_ROOT}
+chmod -R 755 ${DOCUMENT_ROOT}
+find ${DOCUMENT_ROOT} -type d -exec chmod g+s {} \;
+chmod g+w ${DOCUMENT_ROOT}/wp-content
+chmod -R g+w ${DOCUMENT_ROOT}/wp-content/themes
+chmod -R g+w ${DOCUMENT_ROOT}/wp-content/plugins
+# Replace database name, username, and password in wp-config.php
+sed -i "s/database_name_here/${DB_NAME}/g" "${DOCUMENT_ROOT}/wp-config.php"
+sed -i "s/username_here/${DB_USER}/g" "${DOCUMENT_ROOT}/wp-config.php"
+sed -i "s/password_here/${userpass}/g" "${DOCUMENT_ROOT}/wp-config.php"
+
+nginx -t && sudo systemctl reload nginx
+
+echo ""
+echo ""
+echo "Services Restarted. Almost done!"
+
+# Retrieve the salts from the WordPress API
+salts=$(curl -s https://api.wordpress.org/secret-key/1.1/salt/)
+
+# Escape slashes and quotes in the salts
+salts_escaped=$(echo "$salts" | sed 's/[\/&]/\\&/g')
+
+# Replace the default salts in the wp-config.php file
+SALT=$(curl -L https://api.wordpress.org/secret-key/1.1/salt/)
+STRING='put your unique phrase here'
+printf '%s\n' "g/$STRING/d" a "$SALT" . w | ed -s ${DOCUMENT_ROOT}/wp-config.php
+echo ""
+echo ""
+echo "Salts have been updated."
+echo ""
+echo ""
+read -p "Press [ENTER] to display your WordPress MySQL database details!"
+echo "Database Name: ${DB_NAME}"
+echo "Username: ${DB_USER}"
+echo "Password: ${userpass}"
+
