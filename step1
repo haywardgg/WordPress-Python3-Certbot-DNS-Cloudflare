@@ -16,11 +16,10 @@ if [ $(dpkg-query -W -f='${Status}' python3-certbot-dns-cloudflare 2>/dev/null |
   apt install python3-certbot-dns-cloudflare -y
   mkdir /root/.secrets/
   touch /root/.secrets/cloudflare.ini
-  read -p "Enter your Cloudflare Email :" CLOUDFLARE_EMAIL
-  read -p "Enter your Cloudflare API Key:" CLOUDFLARE_API_KEY
+  # Create an API Token with Zone Access only ( https://dash.cloudflare.com/profile/api-tokens ).
+  read -p "Enter your Cloudflare API Token:" CLOUDFLARE_API_TOKEN
   sudo tee /root/.secrets/cloudflare.ini > /dev/null << EOF
-  dns_cloudflare_email = ${CLOUDFLARE_EMAIL}
-  dns_cloudflare_api_key = ${CLOUDFLARE_API_KEY}
+  dns_cloudflare_api_token = ${CLOUDFLARE_API_TOKEN}
 EOF
   chmod 0700 /root/.secrets/
   chmod 0400 /root/.secrets/cloudflare.ini
