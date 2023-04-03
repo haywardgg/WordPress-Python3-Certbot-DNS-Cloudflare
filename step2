@@ -1,5 +1,4 @@
 #!/bin/bash
-#!/bin/bash
 NGINX_CONF_DIR="/etc/nginx"
 AVAILABLE_SITES_DIR="${NGINX_CONF_DIR}/sites-available"
 ENABLED_SITES_DIR="${NGINX_CONF_DIR}/sites-enabled"
