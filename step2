@@ -129,25 +129,21 @@ sed -i "s/database_name_here/${DB_NAME}/g" "${DOCUMENT_ROOT}/wp-config.php"
 sed -i "s/username_here/${DB_USER}/g" "${DOCUMENT_ROOT}/wp-config.php"
 sed -i "s/password_here/${userpass}/g" "${DOCUMENT_ROOT}/wp-config.php"
 
-nginx -t && sudo systemctl reload nginx
-
-echo ""
-echo ""
-echo "Services Restarted. Almost done!"
-
 # Retrieve the salts from the WordPress API
 salts=$(curl -s https://api.wordpress.org/secret-key/1.1/salt/)
-
 # Escape slashes and quotes in the salts
 salts_escaped=$(echo "$salts" | sed 's/[\/&]/\\&/g')
-
 # Replace the default salts in the wp-config.php file
 SALT=$(curl -L https://api.wordpress.org/secret-key/1.1/salt/)
 STRING='put your unique phrase here'
 printf '%s\n' "g/$STRING/d" a "$SALT" . w | ed -s ${DOCUMENT_ROOT}/wp-config.php
-echo ""
-echo ""
 echo "Salts have been updated."
+echo ""
+echo ""
+nginx -t && sudo systemctl reload nginx
+echo "Services Restarted. Almost done!"
+echo ""
+echo ""
 echo ""
 echo ""
 read -p "Press [ENTER] to display your WordPress MySQL database details!"
