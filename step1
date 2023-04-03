@@ -18,7 +18,7 @@ if [ $(dpkg-query -W -f='${Status}' python3-certbot-dns-cloudflare 2>/dev/null |
   touch /root/.secrets/cloudflare.ini
   read -p "Enter your Cloudflare Email :" CLOUDFLARE_EMAIL
   read -p "Enter your Cloudflare API Key:" CLOUDFLARE_API_KEY
-sudo tee /root/.secrets/cloudflare.ini > /dev/null << EOF
+  sudo tee /root/.secrets/cloudflare.ini > /dev/null << EOF
   dns_cloudflare_email = ${CLOUDFLARE_EMAIL}
   dns_cloudflare_api_key = ${CLOUDFLARE_API_KEY}
 EOF
