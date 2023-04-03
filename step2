@@ -120,7 +120,7 @@ mkdir ${DOCUMENT_ROOT}/wp-content/upgrade
 chown -R ${NGINX_USER}:${NGINX_GROUP} ${DOCUMENT_ROOT}
 chmod -R 755 ${DOCUMENT_ROOT}
 find ${DOCUMENT_ROOT} -type d -exec chmod g+s {} \;
-chmod g+w ${DOCUMENT_ROOT}/wp-content
+chmod -R g+w ${DOCUMENT_ROOT}/wp-content
 chmod -R g+w ${DOCUMENT_ROOT}/wp-content/themes
 chmod -R g+w ${DOCUMENT_ROOT}/wp-content/plugins
 # Replace database name, username, and password in wp-config.php
