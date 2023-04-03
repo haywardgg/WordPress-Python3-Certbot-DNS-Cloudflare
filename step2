@@ -21,7 +21,7 @@ echo ""
 read -p "Press any key to continue."
 DOCUMENT_ROOT="/var/www/html/${WEBSITE_NAME}"
 
-certbot certonly --dns-cloudflare --dns-cloudflare-credentials /root/.secrets/cloudflare.ini -d ${WEBSITE_NAME},*.${WEBSITE_NAME} --preferred-challenges dns-01
+certbot certonly --dns-cloudflare --dns-cloudflare-credentials /root/.secrets/cloudflare.ini -d ${WEBSITE_NAME},*.${WEBSITE_NAME}
 
 # Create website directory
 sudo mkdir -p ${DOCUMENT_ROOT}
