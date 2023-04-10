@@ -139,7 +139,7 @@ printf '%s\n' "g/$STRING/d" a "$SALT" . w | ed -s ${DOCUMENT_ROOT}/wp-config.php
 echo "Salts have been updated."
 echo ""
 echo ""
-nginx -t && sudo systemctl reload nginx
+systemctl reload nginx
 echo "Services Restarted. Almost done!"
 echo ""
 echo ""
