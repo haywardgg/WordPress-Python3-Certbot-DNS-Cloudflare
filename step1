@@ -1,7 +1,6 @@
 #!/bin/bash
 
-  apt update -y
-  apt upgrade -y
+  apt update -y && apt upgrade -y
 
 if [ $(dpkg-query -W -f='${Status}' nginx 2>/dev/null | grep -c "ok installed") -eq 0 ]; then
   # nginx is not installed, install it
